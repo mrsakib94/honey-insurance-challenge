@@ -2,6 +2,13 @@
 
 const MAX_IN_PERIOD = 1440;
 
+/* Valid appliance states */
+
+const States = Object.freeze({
+  ON: 'on',
+  OFF: 'off',
+});
+
 /**
  * PART 1
  *
@@ -36,7 +43,35 @@ const MAX_IN_PERIOD = 1440;
  * ```
  */
 
-const calculateEnergyUsageSimple = (profile) => {}
+const calculateEnergyUsageSimple = (profile) => {
+  const { ON, OFF } = States;
+
+  validateInput([ON, OFF], profile);
+
+  const { initial, events } = profile;
+
+  // If there are no events, return the energy used based on the initial state
+  if (!events.length) return initial === 'on' ? MAX_IN_PERIOD : 0;
+
+  let currentTime = 0;
+  let currentState = initial;
+  let energyUsed = 0;
+
+  for (const event of events) {
+    const { timestamp, state } = event;
+
+    // If energy was used in the previous period, add it to the total
+    if (currentState === 'on') energyUsed += timestamp - currentTime;
+
+    currentState = state;
+    currentTime = timestamp;
+  }
+
+  // If the final state was 'on', add the energy used during remaining time in the period
+  if (currentState === 'on') energyUsed += MAX_IN_PERIOD - currentTime;
+
+  return energyUsed;
+};
 
 /**
  * PART 2
@@ -98,9 +133,29 @@ const calculateEnergySavings = (profile) => {};
  * been given for the month.
  */
 
-const isInteger = (number) => Number.isInteger(number);
-
 const calculateEnergyUsageForDay = (monthUsageProfile, day) => {};
+
+// Basic input validation
+const validateInput = (validStates, profile) => {
+  const { initial, events } = profile;
+
+  // Validate initial state
+  if (!validStates.includes(initial))
+    throw new Error(`Invalid initial state: ${initial}`);
+
+  // Validate events
+  for (const event of events) {
+    const { timestamp, state } = event;
+
+    if (!isInteger(timestamp) || timestamp < 0 || timestamp >= MAX_IN_PERIOD)
+      throw new Error(`Invalid timestamp: ${timestamp}`);
+
+    if (!validStates.includes(state))
+      throw new Error(`Invalid event state: ${state}`);
+  }
+};
+
+const isInteger = (number) => Number.isInteger(number);
 
 module.exports = {
   calculateEnergyUsageSimple,

@@ -43,6 +43,14 @@ describe('calculateEnergyUsageSimple', () => {
     expect(calculateEnergyUsageSimple(usageProfile3)).toEqual(1440);
   });
 
+  it('should calculate correctly when the appliance is off the whole time', () => {
+    const usageProfile3 = {
+      initial: 'off',
+      events: [],
+    };
+    expect(calculateEnergyUsageSimple(usageProfile3)).toEqual(0);
+  });
+
   it('should handle duplicate on events', () => {
     const usageProfile = {
       initial: 'off',
@@ -70,6 +78,26 @@ describe('calculateEnergyUsageSimple', () => {
     };
     expect(calculateEnergyUsageSimple(usageProfile)).toEqual(
       80 - 0 + (1440 - 656)
+    );
+  });
+
+  it('should throw an error on invalid input', () => {
+    const usageProfile = {
+      initial: 'invalid',
+      events: [{ timestamp: 1440, state: 'invalid' }],
+    };
+    expect(() => calculateEnergyUsageSimple(usageProfile)).toThrow(
+      /Invalid initial state/
+    );
+
+    usageProfile.initial = 'on';
+    expect(() => calculateEnergyUsageSimple(usageProfile)).toThrow(
+      /Invalid timestamp/
+    );
+
+    usageProfile.events[0].timestamp = 100;
+    expect(() => calculateEnergyUsageSimple(usageProfile)).toThrow(
+      /Invalid event state/
     );
   });
 });
