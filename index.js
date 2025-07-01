@@ -7,6 +7,7 @@ const MAX_IN_PERIOD = 1440;
 const States = Object.freeze({
   ON: 'on',
   OFF: 'off',
+  AUTO_OFF: 'auto-off',
 });
 
 /**
@@ -51,7 +52,7 @@ const calculateEnergyUsageSimple = (profile) => {
   const { initial, events } = profile;
 
   // If there are no events, return the energy used based on the initial state
-  if (!events.length) return initial === 'on' ? MAX_IN_PERIOD : 0;
+  if (!events.length) return initial === ON ? MAX_IN_PERIOD : 0;
 
   let currentTime = 0;
   let currentState = initial;
@@ -61,14 +62,14 @@ const calculateEnergyUsageSimple = (profile) => {
     const { timestamp, state } = event;
 
     // If energy was used in the previous period, add it to the total
-    if (currentState === 'on') energyUsed += timestamp - currentTime;
+    if (currentState === ON) energyUsed += timestamp - currentTime;
 
     currentState = state;
     currentTime = timestamp;
   }
 
   // If the final state was 'on', add the energy used during remaining time in the period
-  if (currentState === 'on') energyUsed += MAX_IN_PERIOD - currentTime;
+  if (currentState === ON) energyUsed += MAX_IN_PERIOD - currentTime;
 
   return energyUsed;
 };
@@ -105,7 +106,51 @@ const calculateEnergyUsageSimple = (profile) => {
  * and not manual intervention.
  */
 
-const calculateEnergySavings = (profile) => {};
+const calculateEnergySavings = (profile) => {
+  const { ON, OFF, AUTO_OFF } = States;
+
+  validateInput([ON, OFF, AUTO_OFF], profile);
+
+  const { initial, events } = profile;
+
+  // If there are no events, return full day if 'auto-off', else 0
+  if (!events.length) return initial === AUTO_OFF ? MAX_IN_PERIOD : 0;
+
+  let savingsStartTime = null;
+  let currentState = initial;
+  let energySaved = 0;
+
+  // If the initial state is 'auto-off', start tracking savings immediately
+  if (currentState === AUTO_OFF) savingsStartTime = 0;
+
+  for (const event of events) {
+    const { timestamp, state } = event;
+
+    // Close active savings window if returning to 'on'
+    if (savingsStartTime !== null && state === ON) {
+      energySaved += timestamp - savingsStartTime;
+      savingsStartTime = null;
+    }
+
+    // Start savings window on 'auto-off' (if not already active)
+    // Only if last state was 'on'
+    if (
+      savingsStartTime === null &&
+      currentState === ON &&
+      state === AUTO_OFF
+    ) {
+      savingsStartTime = timestamp;
+    }
+
+    currentState = state;
+  }
+
+  // If there is an active savings window, update energy savings during remaining time in the period
+  if (savingsStartTime !== null)
+    energySaved += MAX_IN_PERIOD - savingsStartTime;
+
+  return energySaved;
+};
 
 /**
  * PART 3

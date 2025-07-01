@@ -181,6 +181,30 @@ describe('calculateEnergySavings', () => {
     };
     expect(calculateEnergySavings(usageProfile)).toEqual(MAX_IN_PERIOD - 320);
   });
+
+  it('should calculate energy savings correctly if auto-off comes after off', () => {
+    const usageProfile = {
+      initial: 'on',
+      events: [
+        { state: 'off', timestamp: 300 },
+        { state: 'auto-off', timestamp: 500 },
+        { state: 'on', timestamp: 800 },
+      ],
+    };
+    expect(calculateEnergySavings(usageProfile)).toEqual(0);
+  });
+
+  it('should ignore duplicate auto-off events', () => {
+    const usageProfile = {
+      initial: 'on',
+      events: [
+        { state: 'auto-off', timestamp: 300 },
+        { state: 'auto-off', timestamp: 350 },
+        { state: 'on', timestamp: 600 },
+      ],
+    };
+    expect(calculateEnergySavings(usageProfile)).toEqual(600 - 300);
+  });
 });
 
 // Part 3
