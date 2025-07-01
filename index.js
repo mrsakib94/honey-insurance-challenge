@@ -178,10 +178,53 @@ const calculateEnergySavings = (profile) => {
  * been given for the month.
  */
 
-const calculateEnergyUsageForDay = (monthUsageProfile, day) => {};
+const calculateEnergyUsageForDay = (monthUsageProfile, day) => {
+  const { ON, OFF } = States;
+
+  validateInput([ON, OFF], monthUsageProfile, day);
+
+  // Calculate the start and end timestamps for the given day
+  const { initial, events } = monthUsageProfile;
+  const startOfDay = (day - 1) * MAX_IN_PERIOD;
+  const endOfDay = day * MAX_IN_PERIOD;
+
+  let currentState = initial;
+
+  // Determine the state at the start of the day
+  for (const event of events) {
+    if (event.timestamp >= startOfDay) break;
+
+    currentState = event.state;
+  }
+
+  // Slice events that fall within the day
+  const dayEvents = events
+    .filter(
+      (event) => event.timestamp >= startOfDay && event.timestamp < endOfDay
+    )
+    .map((event) => ({
+      timestamp: event.timestamp - startOfDay,
+      state: event.state,
+    }));
+
+  // Build the single day profile
+  const dayProfile = {
+    initial: currentState,
+    events: dayEvents,
+  };
+
+  return calculateEnergyUsageSimple(dayProfile);
+};
 
 // Basic input validation
-const validateInput = (validStates, profile) => {
+const validateInput = (validStates, profile, day) => {
+  // Validate input day type and range
+  if (day !== undefined) {
+    if (!isInteger(day)) throw new Error('Day must be an integer');
+
+    if (day < 1 || day > 365) throw new Error('Input day out of range');
+  }
+
   const { initial, events } = profile;
 
   // Validate initial state
@@ -192,8 +235,12 @@ const validateInput = (validStates, profile) => {
   for (const event of events) {
     const { timestamp, state } = event;
 
-    if (!isInteger(timestamp) || timestamp < 0 || timestamp >= MAX_IN_PERIOD)
+    if (!isInteger(timestamp) || timestamp < 0)
       throw new Error(`Invalid timestamp: ${timestamp}`);
+
+    // Restrict timestamp for a single day
+    if (!day && timestamp >= MAX_IN_PERIOD)
+      throw new Error(`Timestamp exceeds daily range: ${timestamp}`);
 
     if (!validStates.includes(state))
       throw new Error(`Invalid event state: ${state}`);

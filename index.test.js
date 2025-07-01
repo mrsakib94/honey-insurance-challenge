@@ -84,7 +84,7 @@ describe('calculateEnergyUsageSimple', () => {
   it('should throw an error on invalid input', () => {
     const usageProfile = {
       initial: 'invalid',
-      events: [{ timestamp: 1440, state: 'invalid' }],
+      events: [{ timestamp: -1, state: 'invalid' }],
     };
     expect(() => calculateEnergyUsageSimple(usageProfile)).toThrow(
       /Invalid initial state/
@@ -93,6 +93,11 @@ describe('calculateEnergyUsageSimple', () => {
     usageProfile.initial = 'on';
     expect(() => calculateEnergyUsageSimple(usageProfile)).toThrow(
       /Invalid timestamp/
+    );
+
+    usageProfile.events[0].timestamp = 1440;
+    expect(() => calculateEnergyUsageSimple(usageProfile)).toThrow(
+      /Timestamp exceeds daily range/
     );
 
     usageProfile.events[0].timestamp = 100;
@@ -290,8 +295,9 @@ describe('calculateEnergyUsageForDay', () => {
     );
   });
 
+  // Added monthProfile param to the function call as it was missing
   it('should throw an error on a non-integer day number', () => {
-    expect(() => calculateEnergyUsageForDay(3.76)).toThrow(
+    expect(() => calculateEnergyUsageForDay(monthProfile, 3.76)).toThrow(
       /must be an integer/
     );
   });
