@@ -10,6 +10,40 @@ const States = Object.freeze({
   AUTO_OFF: 'auto-off',
 });
 
+/* Basic input validation */
+
+const isInteger = (number) => Number.isInteger(number);
+
+const validateInput = (validStates, profile, day) => {
+  // Validate day type and range
+  if (day !== undefined) {
+    if (!isInteger(day)) throw new Error('Day must be an integer');
+
+    if (day < 1 || day > 365) throw new Error('Input day out of range');
+  }
+
+  const { initial, events } = profile;
+
+  // Validate initial state
+  if (!validStates.includes(initial))
+    throw new Error(`Invalid initial state: ${initial}`);
+
+  // Validate events
+  for (const event of events) {
+    const { timestamp, state } = event;
+
+    if (!isInteger(timestamp) || timestamp < 0)
+      throw new Error(`Invalid timestamp: ${timestamp}`);
+
+    // Restrict timestamp for a single day
+    if (!day && timestamp >= MAX_IN_PERIOD)
+      throw new Error(`Timestamp exceeds daily range: ${timestamp}`);
+
+    if (!validStates.includes(state))
+      throw new Error(`Invalid event state: ${state}`);
+  }
+};
+
 /**
  * PART 1
  *
@@ -106,6 +140,11 @@ const calculateEnergyUsageSimple = (profile) => {
  * and not manual intervention.
  */
 
+const isInvalidTransition = (from, to) => {
+  const { OFF, AUTO_OFF } = States;
+  return (from === AUTO_OFF && to === OFF) || (from === OFF && to === AUTO_OFF);
+};
+
 const calculateEnergySavings = (profile) => {
   const { ON, OFF, AUTO_OFF } = States;
 
@@ -116,38 +155,26 @@ const calculateEnergySavings = (profile) => {
   // If there are no events, return full day if 'auto-off', else 0
   if (!events.length) return initial === AUTO_OFF ? MAX_IN_PERIOD : 0;
 
-  let savingsStartTime = null;
+  let currentTime = 0;
   let currentState = initial;
   let energySaved = 0;
-
-  // If the initial state is 'auto-off', start tracking savings immediately
-  if (currentState === AUTO_OFF) savingsStartTime = 0;
 
   for (const event of events) {
     const { timestamp, state } = event;
 
-    // Close active savings window if returning to 'on'
-    if (savingsStartTime !== null && state === ON) {
-      energySaved += timestamp - savingsStartTime;
-      savingsStartTime = null;
-    }
+    // Only count energy savings for 'auto_off' to 'on transitions
+    if (currentState === AUTO_OFF && state === ON)
+      energySaved += timestamp - currentTime;
 
-    // Start savings window on 'auto-off' (if not already active)
-    // Only if last state was 'on'
-    if (
-      savingsStartTime === null &&
-      currentState === ON &&
-      state === AUTO_OFF
-    ) {
-      savingsStartTime = timestamp;
+    // Skip duplicate events and invalid transitions
+    if (currentState !== state && !isInvalidTransition(currentState, state)) {
+      currentState = state;
+      currentTime = timestamp;
     }
-
-    currentState = state;
   }
 
-  // If there is an active savings window, update energy savings during remaining time in the period
-  if (savingsStartTime !== null)
-    energySaved += MAX_IN_PERIOD - savingsStartTime;
+  // If the final state was 'auto_off', add the energy saved during remaining time in the period
+  if (currentState === AUTO_OFF) energySaved += MAX_IN_PERIOD - currentTime;
 
   return energySaved;
 };
@@ -215,39 +242,6 @@ const calculateEnergyUsageForDay = (monthUsageProfile, day) => {
 
   return calculateEnergyUsageSimple(dayProfile);
 };
-
-// Basic input validation
-const validateInput = (validStates, profile, day) => {
-  // Validate input day type and range
-  if (day !== undefined) {
-    if (!isInteger(day)) throw new Error('Day must be an integer');
-
-    if (day < 1 || day > 365) throw new Error('Input day out of range');
-  }
-
-  const { initial, events } = profile;
-
-  // Validate initial state
-  if (!validStates.includes(initial))
-    throw new Error(`Invalid initial state: ${initial}`);
-
-  // Validate events
-  for (const event of events) {
-    const { timestamp, state } = event;
-
-    if (!isInteger(timestamp) || timestamp < 0)
-      throw new Error(`Invalid timestamp: ${timestamp}`);
-
-    // Restrict timestamp for a single day
-    if (!day && timestamp >= MAX_IN_PERIOD)
-      throw new Error(`Timestamp exceeds daily range: ${timestamp}`);
-
-    if (!validStates.includes(state))
-      throw new Error(`Invalid event state: ${state}`);
-  }
-};
-
-const isInteger = (number) => Number.isInteger(number);
 
 module.exports = {
   calculateEnergyUsageSimple,
